@@ -1,3 +1,33 @@
+locals {
+  user_data = <<-EOT
+    #!/bin/bash
+
+    echo "### INSTALLING MYSQL CLIENT ###"
+    sudo rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2022
+    sudo yum install -y https://dev.mysql.com/get/mysql57-community-release-el7-11.noarch.rpm
+    sudo yum install -y mysql-community-client
+
+    sleep 60
+    sudo rm -rf /var/lib/rpm/.rpm.lock
+
+    echo "### INSTALLING MYSQL SERVER ###"
+    sudo yum install -y mysql-community-server
+
+    echo "### START AND ENABLE MYSQLD SERVICE ###"
+    sudo service mysqld start
+    sudo systemctl enable mysqld
+
+    MYSQL_SERVER_PASSWORD="${random_password.mysql.result}"
+
+    TMP_PASSWORD=$(sudo cat /var/log/mysqld.log  | grep 'temporary password' | awk '{print $11}')
+
+    mysql --connect-expired-password  -u root -h 127.0.0.1 -p$TMP_PASSWORD <<< "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MYSQL_SERVER_PASSWORD'"
+
+    sudo service mysqld restart
+
+  EOT
+}
+
 module "ec2_security_group" {
   source = "git::https://github.com/terraform-aws-modules/terraform-aws-security-group.git//?ref=v5.1.0"
 
